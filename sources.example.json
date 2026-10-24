@@ -1,0 +1,25 @@
+[
+  {
+    "name": "Demo player (local, plays nothing)",
+    "hosts": ["localhost:5178"],
+    "movie": "http://{host}/demo/player.html?id={imdb}&t={t}",
+    "episode": "http://{host}/demo/player.html?id={imdb}&s={season}&e={episode}&t={t}",
+    "sandbox": true
+  },
+  {
+    "name": "Example: IMDb ids, several mirrors",
+    "enabled": false,
+    "hosts": ["example.com", "example.net", "example.org"],
+    "movie": "https://{host}/embed/movie/{imdb}",
+    "episode": "https://{host}/embed/tv/{imdb}/{season}/{episode}",
+    "sandbox": true
+  },
+  {
+    "name": "Example: TMDB ids, resumes at {t}",
+    "enabled": false,
+    "hosts": [],
+    "movie": "https://player.example.com/movie/{tmdb}?start={t}",
+    "episode": "https://player.example.com/tv/{tmdb}/{season}/{episode}?start={t}",
+    "sandbox": false
+  }
+]

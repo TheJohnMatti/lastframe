@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>lastframe demo player</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; color: #eee; font: 15px system-ui, sans-serif; }
+  .stage { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; }
+  .screen { font-size: 15px; color: #888; text-align: center; }
+  .time { font-size: 44px; font-variant-numeric: tabular-nums; font-weight: 700; }
+  button { font: inherit; padding: 10px 22px; border-radius: 8px; border: 1px solid #444; background: #1c1c1c; color: #eee; cursor: pointer; }
+  input[type=range] { width: min(560px, 80vw); }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="screen" id="what"></div>
+  <div class="time" id="time">0:00</div>
+  <input id="seek" type="range" min="0" step="1" />
+  <div><button id="play">Play</button> <button id="end">Skip to end</button></div>
+</div>
+<script>
+  // A stand-in for an embeddable player, so lastframe can be tried without any
+  // real source. It plays nothing; it counts, and reports its time to the
+  // parent the way many embed players do.
+  const q = new URLSearchParams(location.search)
+  const duration = Number(q.get('duration') || 2700)
+  let time = Number(q.get('t') || 0)
+  let playing = false
+  const label = q.get('s') ? `${q.get('id')} · S${q.get('s')} E${q.get('e')}` : q.get('id') || 'unknown title'
+  document.getElementById('what').textContent = `Demo player · ${label}`
+  const seek = document.getElementById('seek')
+  seek.max = duration
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+  function post(event) {
+    parent.postMessage({ type: 'PLAYER_EVENT', data: { event, currentTime: time, duration } }, '*')
+  }
+  function draw() {
+    document.getElementById('time').textContent = `${fmt(time)} / ${fmt(duration)}`
+    seek.value = time
+    document.getElementById('play').textContent = playing ? 'Pause' : 'Play'
+  }
+  document.getElementById('play').onclick = () => { playing = !playing; post(playing ? 'play' : 'pause'); draw() }
+  document.getElementById('end').onclick = () => { time = duration - 20; post('seeked'); draw() }
+  seek.oninput = () => { time = Number(seek.value); post('seeked'); draw() }
+  setInterval(() => {
+    if (!playing) return
+    time = Math.min(duration, time + 1)
+    if (time >= duration) { playing = false; post('ended') } else post('timeupdate')
+    draw()
+  }, 1000)
+  draw()
+  post('ready')
+</script>
+</body>
+</html>
