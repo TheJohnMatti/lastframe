@@ -221,9 +221,57 @@ export function probe(origin: string, timeoutMs = 7000): Promise<Health> {
   return job
 }
 
+// Known titles for previews and for reading templates out of example URLs.
+export const SAMPLE_MOVIE: Target = { type: 'movie', imdb: 'tt0468569', tmdb: '155', title: 'The Dark Knight', year: '2008', startAt: 0 }
+export const SAMPLE_EPISODE: Target = { type: 'series', imdb: 'tt0903747', tmdb: '1396', season: 3, episode: 7, title: 'Breaking Bad', year: '2008', startAt: 0 }
+
 export function originsOf(source: Source): string[] {
-  const sample: Target = { type: 'movie', imdb: 'tt0468569', tmdb: '155', title: 'The Dark Knight', year: '2008', startAt: 0 }
-  const fromMovie = candidatesFor(source, sample)
-  const fromEpisode = candidatesFor(source, { ...sample, type: 'series', season: 1, episode: 1 })
+  const fromMovie = candidatesFor(source, SAMPLE_MOVIE)
+  const fromEpisode = candidatesFor(source, SAMPLE_EPISODE)
   return [...new Set([...fromMovie, ...fromEpisode].map((c) => c.origin))]
+}
+
+export type Derived = { template: string; host: string } | { error: string }
+
+// Turn a player URL for a known sample title back into a template: its ids
+// become {imdb}/{tmdb}, its season and episode numbers {season}/{episode},
+// and its domain {host}.
+export function templateFromExample(raw: string, sample: Target): Derived {
+  let url: URL
+  try {
+    const text = raw.trim()
+    url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`)
+    if (!url.hostname.includes('.') && url.hostname !== 'localhost') throw new Error('no domain')
+  } catch {
+    return { error: 'Paste the whole address, starting with https://' }
+  }
+  const whole = (n: string) => new RegExp(`(^|[^0-9])${n}(?![0-9])`, 'g')
+  let path = url.pathname + url.search + url.hash
+  const hasImdb = path.includes(sample.imdb)
+  const hasTmdb = !!sample.tmdb && whole(sample.tmdb).test(path)
+  if (!hasImdb && !hasTmdb)
+    return {
+      error: `No id for ${sample.title} in that address (IMDb ${sample.imdb}, TMDB ${sample.tmdb}). It has to be the player's own address, opened on ${sample.title}.`,
+    }
+  if (hasImdb) path = path.split(sample.imdb).join('{imdb}')
+  if (hasTmdb) path = path.replace(whole(sample.tmdb!), '$1{tmdb}')
+
+  if (sample.type === 'series') {
+    const number = (n: number) => new RegExp(`([/=_-])0?${n}(?![0-9])`)
+    const idAt = Math.max(path.indexOf('{imdb}'), path.indexOf('{tmdb}'))
+    // numbers usually follow the id; fall back to anywhere in the address
+    const start = number(sample.season!).test(path.slice(idAt)) ? idAt : 0
+    const head = path.slice(0, start)
+    let tail = path.slice(start)
+    if (!number(sample.season!).test(tail))
+      return { error: `Found the show but not season ${sample.season}. Paste the player for season ${sample.season}, episode ${sample.episode}.` }
+    tail = tail.replace(number(sample.season!), '$1{season}')
+    const at = tail.indexOf('{season}') + '{season}'.length
+    const rest = tail.slice(at)
+    if (!number(sample.episode!).test(rest))
+      return { error: `Found season ${sample.season} but not episode ${sample.episode}.` }
+    path = head + tail.slice(0, at) + rest.replace(number(sample.episode!), '$1{episode}')
+  }
+  path = path.replace(/([?&](?:t|start|startat|time|progress|resume|resumeat)=)\d+/i, '$1{t}')
+  return { template: `${url.protocol}//{host}${path}`, host: url.host }
 }

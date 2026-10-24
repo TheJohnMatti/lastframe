@@ -237,6 +237,13 @@ section + section { margin-top: 36px; }
 }
 .source-form input:focus, .source-form textarea:focus { border-color: var(--accent); }
 .source-form textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
+.from-example { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.from-example summary { cursor: pointer; font-weight: 600; }
+.from-example p { margin: 10px 0 12px; font-size: 14px; }
+.from-example .example { margin-top: 10px; }
+.from-example .example span { font-weight: 600; font-size: 14px; }
+.from-example .example a { color: var(--accent); }
+.from-example .warn, .from-example .ok { margin-top: 6px; font-size: 13px; word-break: break-all; }
 .check-row { display: flex; gap: 10px; align-items: flex-start; font-size: 14.5px; margin-bottom: 12px; cursor: pointer; }
 .check-row input { margin-top: 4px; accent-color: var(--accent); }
 .preview { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }

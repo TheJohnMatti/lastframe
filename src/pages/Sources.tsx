@@ -11,15 +11,16 @@ import {
   originsOf,
   parseSourceList,
   probe,
+  SAMPLE_EPISODE,
+  SAMPLE_MOVIE,
   sourcesStore,
   statusOf,
   TEMPLATE_VARS,
+  templateFromExample,
   type Source,
   type Target,
 } from '../lib/sources'
-
-const SAMPLE_MOVIE: Target = { type: 'movie', imdb: 'tt0468569', tmdb: '155', title: 'The Dark Knight', year: '2008', startAt: 0 }
-const SAMPLE_EPISODE: Target = { type: 'series', imdb: 'tt0903747', tmdb: '1396', season: 1, episode: 2, title: 'Breaking Bad', year: '2008', startAt: 0 }
+import { href, titlePath } from '../lib/router'
 
 function updateSources(fn: (list: Source[]) => Source[]) {
   sourcesStore.set((st) => ({ ...st, sources: fn(st.sources) }))
@@ -188,6 +189,11 @@ function SourceForm({ initial, onSave, onCancel }: { initial?: Source; onSave: (
   const [episode, setEpisode] = useState(initial?.episode ?? '')
   const [sandbox, setSandbox] = useState(initial?.sandbox ?? settingsStore.get().sandboxDefault)
   const draft = normalizeSource({ id: initial?.id, enabled: initial?.enabled ?? true, name, hosts, movie, episode, sandbox })
+  const fillFrom = (set: (t: string) => void) => (d: { template: string; host: string }) => {
+    set(d.template)
+    setHosts((h) => (h.split(/[\s,]+/).includes(d.host) ? h : h.trim() ? `${h.trim()}\n${d.host}` : d.host))
+    setName((n) => n || siteName(d.host))
+  }
   const usesHost = movie.includes('{host}') || episode.includes('{host}')
   const preview = draft
     ? [...candidatesFor(draft, SAMPLE_MOVIE).slice(0, 1), ...candidatesFor(draft, SAMPLE_EPISODE).slice(0, 1)]
@@ -202,6 +208,17 @@ function SourceForm({ initial, onSave, onCancel }: { initial?: Source; onSave: (
       }}
     >
       <h2>{initial ? `Edit ${initial.name}` : 'New source'}</h2>
+      <details className="from-example" open={!initial}>
+        <summary>Fill in from an example</summary>
+        <p className="muted">
+          On the site, open the player for each title below and paste the player's address. The URL templates and the
+          host fill themselves in. If the site puts its player inside its own page, you need the inner player's
+          address: in Chrome, right-click the video, choose View frame source, and copy the address after{' '}
+          <code>view-source:</code>.
+        </p>
+        <FromExample sample={SAMPLE_MOVIE} label="The Dark Knight (2008)" onDerived={fillFrom(setMovie)} />
+        <FromExample sample={SAMPLE_EPISODE} label="Breaking Bad, season 3, episode 7" onDerived={fillFrom(setEpisode)} />
+      </details>
       <label>
         Name
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="What you call it" autoFocus />
@@ -236,5 +253,36 @@ function SourceForm({ initial, onSave, onCancel }: { initial?: Source; onSave: (
         <button type="button" className="btn ghost" onClick={onCancel}>Cancel</button>
       </div>
     </form>
+  )
+}
+
+function siteName(host: string): string {
+  const labels = host.replace(/:\d+$/, '').replace(/^www\./, '').split('.')
+  const label = labels.length > 1 ? labels[labels.length - 2] : labels[0]
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
+function FromExample({ sample, label, onDerived }: { sample: Target; label: string; onDerived: (d: { template: string; host: string }) => void }) {
+  const [text, setText] = useState('')
+  const result = text.trim() ? templateFromExample(text, sample) : null
+  return (
+    <div className="example">
+      <label>
+        <span>
+          Player address for <a href={href(titlePath(sample.type, sample.imdb))} target="_blank" rel="noreferrer">{label}</a>
+        </span>
+        <input
+          value={text}
+          spellCheck={false}
+          placeholder="https://…"
+          onChange={(e) => {
+            setText(e.target.value)
+            const r = templateFromExample(e.target.value, sample)
+            if ('template' in r) onDerived(r)
+          }}
+        />
+      </label>
+      {result && ('error' in result ? <div className="warn">{result.error}</div> : <div className="ok small">✓ {result.template}</div>)}
+    </div>
   )
 }
