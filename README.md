@@ -36,6 +36,7 @@ https://{host}/embed/tv/{imdb}/{season}/{episode}
 You can add sources in three ways:
 
 - **Sources page**: add, reorder, enable and disable sources. Each one shows a preview URL and whether its hosts are reachable.
+  The easiest way to add a source is the **Grab for lastframe** bookmark on the Sources page. Drag it to your bookmarks bar once. On a site, open *The Dark Knight*, press play and click the bookmark, then do the same on *Breaking Bad* S3E7. The bookmark reads the players embedded in the page, including ones nested in frames and on pages that block right-click, and lastframe adds the source by itself.
   You rarely need to write a template by hand. Under **Fill in from an example**, paste the site's player address for *The Dark Knight* and for *Breaking Bad* S3E7. lastframe turns the ids, season and episode numbers and any start-time parameter into placeholders, and adds the domain as a host. If a site keeps changing domains, list the others under Hosts and they're tried in order.
 - **`public/sources.local.json`**: gitignored. Its contents are loaded on first run, or again from the Sources page. The format is in [`sources.example.json`](sources.example.json).
 - **Import JSON**: load a list you keep somewhere private.

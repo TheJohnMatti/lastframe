@@ -43,7 +43,7 @@ export default function App() {
       page = <Library tab={query.get('tab') ?? ''} />
       break
     case 'sources':
-      page = <Sources />
+      page = <Sources grab={query.get('grab')} />
       break
     case 'settings':
       page = <Settings />

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Empty, StatusDot } from '../components/ui'
 import { settingsStore } from '../lib/library'
 import { download } from '../lib/backup'
@@ -13,6 +13,7 @@ import {
   probe,
   SAMPLE_EPISODE,
   SAMPLE_MOVIE,
+  siteName,
   sourcesStore,
   statusOf,
   TEMPLATE_VARS,
@@ -20,18 +21,27 @@ import {
   type Source,
   type Target,
 } from '../lib/sources'
-import { href, titlePath } from '../lib/router'
+import { navigate } from '../lib/router'
+import { applyGrab, bookmarklet, parseGrab } from '../lib/grab'
 
 function updateSources(fn: (list: Source[]) => Source[]) {
   sourcesStore.set((st) => ({ ...st, sources: fn(st.sources) }))
 }
 
-export function Sources() {
+export function Sources({ grab }: { grab?: string | null }) {
   const { sources } = sourcesStore.use()
   const health = healthStore.use()
   const [editing, setEditing] = useState<Source | 'new' | null>(null)
   const [message, setMessage] = useState('')
   const fileInput = useRef<HTMLInputElement>(null)
+
+  // A player handed over by the grab bookmarklet.
+  useEffect(() => {
+    if (!grab) return
+    const payload = parseGrab(grab)
+    setMessage(payload ? applyGrab(payload).message : 'That grab came through cut off. Click the bookmark again.')
+    navigate('/sources', true)
+  }, [grab])
 
   const checkAll = () => sources.flatMap(originsOf).forEach((o) => probe(o))
 
@@ -73,6 +83,8 @@ export function Sources() {
         you use here, or keep them in <code>public/sources.local.json</code> (gitignored) and they load on first run.
       </p>
       {message && <div className="notice" onClick={() => setMessage('')}>{message}</div>}
+
+      <GrabPanel />
 
       {editing && (
         <SourceForm
@@ -256,12 +268,6 @@ function SourceForm({ initial, onSave, onCancel }: { initial?: Source; onSave: (
   )
 }
 
-function siteName(host: string): string {
-  const labels = host.replace(/:\d+$/, '').replace(/^www\./, '').split('.')
-  const label = labels.length > 1 ? labels[labels.length - 2] : labels[0]
-  return label.charAt(0).toUpperCase() + label.slice(1)
-}
-
 function FromExample({ sample, label, onDerived }: { sample: Target; label: string; onDerived: (d: { template: string; host: string }) => void }) {
   const [text, setText] = useState('')
   const result = text.trim() ? templateFromExample(text, sample) : null
@@ -269,7 +275,7 @@ function FromExample({ sample, label, onDerived }: { sample: Target; label: stri
     <div className="example">
       <label>
         <span>
-          Player address for <a href={href(titlePath(sample.type, sample.imdb))} target="_blank" rel="noreferrer">{label}</a>
+          Player address for {label}
         </span>
         <input
           value={text}
@@ -284,5 +290,54 @@ function FromExample({ sample, label, onDerived }: { sample: Target; label: stri
       </label>
       {result && ('error' in result ? <div className="warn">{result.error}</div> : <div className="ok small">✓ {result.template}</div>)}
     </div>
+  )
+}
+
+function GrabPanel() {
+  const link = useRef<HTMLAnchorElement>(null)
+  const [copied, setCopied] = useState(false)
+  const code = bookmarklet(`${location.origin}${location.pathname}`)
+
+  // React refuses javascript: hrefs, so set it on the element directly.
+  useEffect(() => {
+    link.current?.setAttribute('href', code)
+  }, [code])
+
+  return (
+    <section className="panel grab">
+      <h2>Grab players from any site</h2>
+      <ol>
+        <li>
+          Drag this to your bookmarks bar (⌘⇧B shows the bar):{' '}
+          <a
+            ref={link}
+            className="btn primary small bookmarklet"
+            onClick={(e) => {
+              e.preventDefault()
+              alert('Drag this button to your bookmarks bar, then click it on a streaming site.')
+            }}
+          >
+            ⤓ Grab for lastframe
+          </a>{' '}
+          <button
+            className="link-btn"
+            onClick={() => navigator.clipboard.writeText(code).then(() => setCopied(true), () => setCopied(false))}
+          >
+            {copied ? 'copied' : 'or copy it'}
+          </button>
+        </li>
+        <li>
+          On a site, open <strong>The Dark Knight</strong>, press play, and click the
+          bookmark. The site's player is added as a source for movies.
+        </li>
+        <li>
+          On the same site, open <strong>Breaking Bad season 3, episode 7</strong>, press play, and click it again. Now it plays episodes too.
+        </li>
+      </ol>
+      <p className="muted">
+        The bookmark reads the players embedded in the page, so blocked right-click and devtools don't matter. What it
+        finds goes only to this tab.
+      </p>
+    </section>
   )
 }

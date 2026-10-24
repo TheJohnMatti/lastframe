@@ -231,6 +231,12 @@ export function originsOf(source: Source): string[] {
   return [...new Set([...fromMovie, ...fromEpisode].map((c) => c.origin))]
 }
 
+export function siteName(host: string): string {
+  const labels = host.replace(/:\d+$/, '').replace(/^www\./, '').split('.')
+  const label = labels.length > 1 ? labels[labels.length - 2] : labels[0]
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
 export type Derived = { template: string; host: string } | { error: string }
 
 // Turn a player URL for a known sample title back into a template: its ids

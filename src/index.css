@@ -237,6 +237,10 @@ section + section { margin-top: 36px; }
 }
 .source-form input:focus, .source-form textarea:focus { border-color: var(--accent); }
 .source-form textarea { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
+.grab { margin-top: 0; margin-bottom: 24px; border-color: rgba(242, 181, 68, 0.4); }
+.grab ol { margin: 0 0 12px; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; }
+.grab li a:not(.btn) { color: var(--accent); }
+.bookmarklet { cursor: grab; }
 .from-example { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
 .from-example summary { cursor: pointer; font-weight: 600; }
 .from-example p { margin: 10px 0 12px; font-size: 14px; }
