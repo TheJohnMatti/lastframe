@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Empty, StatusDot } from '../components/ui'
+import { ConfirmButton, Empty, StatusDot } from '../components/ui'
 import { settingsStore } from '../lib/library'
 import { download } from '../lib/backup'
 import {
@@ -133,12 +133,9 @@ export function Sources({ grab }: { grab?: string | null }) {
                   {s.enabled ? 'Disable' : 'Enable'}
                 </button>
                 <button className="btn small" onClick={() => setEditing(s)}>Edit</button>
-                <button
-                  className="btn small ghost"
-                  onClick={() => confirm(`Delete ${s.name}?`) && updateSources((l) => l.filter((x) => x.id !== s.id))}
-                >
+                <ConfirmButton ask="Really delete?" onConfirm={() => updateSources((l) => l.filter((x) => x.id !== s.id))}>
                   Delete
-                </button>
+                </ConfirmButton>
               </div>
             </li>
           ))}
@@ -300,6 +297,7 @@ function FromExample({ sample, label, onDerived }: { sample: Target; label: stri
 function GrabPanel() {
   const link = useRef<HTMLAnchorElement>(null)
   const [copied, setCopied] = useState(false)
+  const [clicked, setClicked] = useState(false)
   const code = bookmarklet(`${location.origin}${location.pathname}`)
 
   // React refuses javascript: hrefs, so set it on the element directly.
@@ -318,7 +316,7 @@ function GrabPanel() {
             className="btn primary small bookmarklet"
             onClick={(e) => {
               e.preventDefault()
-              alert('Drag this button to your bookmarks bar, then click it on a streaming site.')
+              setClicked(true)
             }}
           >
             ⤓ Grab for lastframe
@@ -329,6 +327,7 @@ function GrabPanel() {
           >
             {copied ? 'copied' : 'or copy it'}
           </button>
+          {clicked && <div className="warn">Don't click it here: drag it onto your bookmarks bar, then click it on a site.</div>}
         </li>
         <li>
           On a site, open <strong>The Dark Knight</strong>, press play, and click the

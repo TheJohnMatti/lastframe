@@ -88,6 +88,7 @@ section + section { margin-top: 36px; }
 .btn.ghost { background: transparent; }
 .btn.danger { color: var(--bad); }
 .btn.on { border-color: var(--ok); color: var(--ok); }
+.btn.armed { border-color: var(--bad); color: var(--bad); background: rgba(248, 113, 113, 0.1); }
 .btn.disabled, .btn:disabled { opacity: 0.5; cursor: default; pointer-events: none; }
 .icon-btn { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); cursor: pointer; }
 .icon-btn:disabled { opacity: 0.3; cursor: default; }

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Empty, Poster, ProgressBar, Spinner } from '../components/ui'
+import { ConfirmButton, Empty, Poster, ProgressBar, Spinner } from '../components/ui'
 import { useMeta } from '../lib/hooks'
 import type { Episode, MediaType, Meta } from '../lib/meta'
 import {
@@ -130,16 +130,9 @@ function Actions({ meta, item }: { meta: Meta; item?: LibraryItem }) {
         </button>
       )}
       {item && (
-        <button
-          className="btn ghost"
-          onClick={() => {
-            if (confirm(`Forget everything about ${meta.name}? Its progress and watchlist entry are removed.`)) {
-              removeFromLibrary(meta.id)
-            }
-          }}
-        >
+        <ConfirmButton className="btn ghost" ask="Forget its progress too?" onConfirm={() => removeFromLibrary(meta.id)}>
           Forget
-        </button>
+        </ConfirmButton>
       )}
       {play.note && <span className="action-note">{play.note}</span>}
     </div>

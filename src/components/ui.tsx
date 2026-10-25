@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { href } from '../lib/router'
 import { posterFor } from '../lib/meta'
 
@@ -87,4 +87,37 @@ export function Empty({ title, children }: { title: string; children?: ReactNode
 export function StatusDot({ status }: { status: 'up' | 'down' | 'unknown' | 'checking' }) {
   const label = { up: 'reachable', down: 'not reachable', unknown: 'not checked yet', checking: 'checking' }[status]
   return <span className={`dot dot-${status}`} title={label} aria-label={label} />
+}
+
+// Destructive actions ask by changing the button, not with a browser
+// confirm() popup, which some browsers and embedded panes silently suppress.
+export function ConfirmButton({
+  children,
+  ask = 'Click again to confirm',
+  onConfirm,
+  className = 'btn small ghost',
+}: {
+  children: ReactNode
+  ask?: string
+  onConfirm: () => void
+  className?: string
+}) {
+  const [armed, setArmed] = useState(false)
+  useEffect(() => {
+    if (!armed) return
+    const t = setTimeout(() => setArmed(false), 4000)
+    return () => clearTimeout(t)
+  }, [armed])
+  return (
+    <button
+      className={`${className}${armed ? ' armed' : ''}`}
+      onClick={() => {
+        if (!armed) return setArmed(true)
+        setArmed(false)
+        onConfirm()
+      }}
+    >
+      {armed ? ask : children}
+    </button>
+  )
 }

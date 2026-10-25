@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { ConfirmButton } from '../components/ui'
 import { libraryStore, settingsStore, type Settings as SettingsShape } from '../lib/library'
 import { download, exportAll, importAll } from '../lib/backup'
 import { healthStore } from '../lib/sources'
@@ -103,12 +104,9 @@ export function Settings() {
           />
         </div>
         <div className="actions">
-          <button
-            className="btn ghost danger"
-            onClick={() => confirm('Erase all watch history and your watchlist? Sources and settings stay.') && libraryStore.set({})}
-          >
+          <ConfirmButton className="btn ghost danger" ask="Erase all history and the watchlist?" onConfirm={() => libraryStore.set({})}>
             Erase watch history
-          </button>
+          </ConfirmButton>
         </div>
       </section>
     </div>
