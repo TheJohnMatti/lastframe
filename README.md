@@ -1,8 +1,8 @@
 # lastframe
 
-A local-first watch tracker with a player that wraps embeddable players from sites you choose.
+A local-first watch tracker for the video sites you choose.
 
-Search a movie or show, press play, and lastframe remembers where you are: which episode, how far in, what's next. Those embed sites go down all the time, so every title has a list of fallbacks. Unreachable sites are skipped, a player that never loads is dropped, and lastframe remembers which source worked for each title.
+Search a movie or show, press play, and lastframe opens it on one of your sites in a new tab. Its browser extension follows the video in that tab and remembers where you are: which episode, how far in, what's next. Press play again later and it resumes there. Sites go down all the time, so every title has a list of fallbacks, and lastframe remembers which source worked for each title.
 
 There's no account and no server. Your history lives in your browser.
 
@@ -14,6 +14,24 @@ npm run dev
 ```
 
 Open http://localhost:5178. The port is fixed on purpose, because your library is stored per origin.
+
+## The browser extension
+
+Pages can't see inside other sites' tabs, so the tracking is done by a small extension in [`extension/`](extension). Install it once in Chrome (or another Chromium browser):
+
+1. Open `chrome://extensions`.
+2. Turn on **Developer mode**.
+3. Click **Load unpacked** and choose the `extension` folder.
+4. Reload lastframe. **Settings → Browser extension** says when it's connected.
+
+What it does:
+
+- When you press play in lastframe, the extension opens the site in a new tab and remembers which title and episode that tab is for.
+- A script in every frame of that tab, including the site's player frame, finds the long video that's playing and reports its position every 10 seconds, on pause, and when you leave. Previews and ads (anything under four minutes, or far shorter than the title) are ignored.
+- On reopening, it waits for the real video to start, seeks to where you stopped (minus the rewind from Settings), checks the seek held, and offers a **Jump there** button if the player fights back.
+- It reports nothing for tabs lastframe didn't open, and keeps everything in your browser. lastframe's page reads the progress through a script that only runs on `localhost:5178`.
+
+After pulling changes to `extension/`, press the reload arrow on its card in `chrome://extensions`. Without the extension, lastframe still opens sites in tabs; you set your place by hand.
 
 ## Sources
 
@@ -41,34 +59,30 @@ You can add sources in three ways:
 - **`public/sources.local.json`**: gitignored. Its contents are loaded on first run, or again from the Sources page. The format is in [`sources.example.json`](sources.example.json).
 - **Import JSON**: load a list you keep somewhere private.
 
-To try lastframe without a real source, enable the demo source in `sources.example.json`. It turns itself off once you grab a real site. It points at `public/demo/player.html`, a stand-in player that plays nothing but reports its time the way real embeds do.
+To try lastframe without a real source, enable the demo source in `sources.example.json`. It turns itself off once you grab a real site. It points at `public/demo/player.html`, a stand-in player with a blank, silent 75-minute video that the extension follows like any other.
 
 ### Sites whose players use their own codes
 
-Some sites address their players with per-title codes instead of the IMDb or TMDB id, so there's nothing to turn into a template. lastframe doesn't try to crack those. For such a site, search it for *The Dark Knight* and click the bookmark on the results page. The source then works in **search mode**: playing anything opens the site's own search for that title inside the player, you click the right episode there, and lastframe still keeps your place. If clicking a result does nothing, the site wants to open a new tab, so turn off the sandbox for that source. Sites that refuse to be shown inside another page won't work at all.
+Some sites address their players with per-title codes instead of the IMDb or TMDB id, so there's nothing to turn into a template. lastframe doesn't try to crack those. For such a site, search it for *The Dark Knight* and click the bookmark on the results page. The source then works in **search mode**: playing anything opens the site's own search for that title in a tab, you click the right episode there, and the extension still knows which title the tab is for.
 
 ### How fallback works
 
 1. Sources are tried in this order: the one that last played this title, then the one that last played anything, then your list order. Sources that failed on this title go last.
-2. Every host is probed when the player opens. Hosts that don't answer (DNS failure, refused connection, timeout) are skipped. The result is cached for a few minutes.
-3. A player that hasn't loaded after 20 seconds is dropped. You can change this in Settings.
-4. **Not playing? Next source** skips every mirror of that source for this title and moves on.
+2. Every host is probed when you open a title. Hosts that don't answer (DNS failure, refused connection, timeout) are passed over, unless nothing better is left.
+3. **Didn't play? Next source** skips every mirror of that source for this title and moves on.
+4. When the extension sees a title actually play on a source, that source goes first for the title next time.
 
-The probe can tell that a site is up. It can't tell that a title plays there. That's what the button is for.
-
-Sources are sandboxed by default, which blocks popups, new tabs and redirects out of the player. Turn the sandbox off for any site that refuses to play inside one.
+You can still play a site inside lastframe (**Play it inside lastframe instead**). Many sites refuse to be shown inside another page, block logins there, or never finish loading, which is why tabs are the default. Sandboxed sources can't redirect lastframe's tab while playing inside it.
 
 ## How tracking works
 
-The page can't see inside another site's player, so lastframe gets your position in one of three ways:
-
-- **Synced**: many embed players send playback events with `postMessage`. lastframe looks for a position and duration in any message from the player's frames, without knowing any particular site. When it finds them, tracking is exact.
-- **Clock**: if a player is silent, lastframe starts a clock when you click into the player and counts from your last spot. Pause the clock when you pause the video. You can turn this off in Settings.
+- **In a tab, with the extension**: exact. See [The browser extension](#the-browser-extension).
+- **Inside lastframe**: players that announce their time with `postMessage` are followed exactly; for silent ones a clock starts when you click into the player. You can turn the clock off in Settings.
 - **By hand**: ±1 or ±5 minutes, type a time, or mark watched.
 
 At 90% of the runtime an episode counts as watched (you can change this in Settings), and the next one is offered. On a show's page you can tick episodes or use **up to here** to mark everything before an episode as watched. That's how you bring in what you've already seen.
 
-Resuming passes your spot, minus a few seconds, to sources whose templates use `{t}`. For other sources, lastframe shows you where to seek.
+Resuming passes your spot, minus a few seconds, to sources whose templates use `{t}`, and the extension seeks there in any case.
 
 ## Your data
 
@@ -85,7 +99,7 @@ npm run preview   # serve dist/ on the same port
 
 ## Disclaimer
 
-lastframe hosts no media, links to no media, and comes with no streaming sources. It's a tracker and a frame. What you load into it is up to you, and so is following the copyright law where you live.
+lastframe hosts no media, links to no media, and comes with no streaming sources. It's a tracker and a launcher. What you load into it is up to you, and so is following the copyright law where you live.
 
 ## License
 

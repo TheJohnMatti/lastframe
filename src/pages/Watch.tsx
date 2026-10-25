@@ -26,6 +26,7 @@ import {
   type Target,
 } from '../lib/sources'
 import { extractTimes, isFromFrame } from '../lib/playerMessages'
+import { launchInTab, useExtension } from '../lib/extension'
 import { clock, epLabel, parseClock, parseRuntime } from '../lib/format'
 import { href, titlePath, watchPath } from '../lib/router'
 
@@ -58,6 +59,12 @@ function Player({ meta, season, episode }: { meta: Meta; season?: number; episod
   const { sources } = sourcesStore.use()
   const health = healthStore.use()
   const progress = libraryStore.use()[meta.id]?.progress[key]
+  const ext = useExtension()
+  // Sites open in their own tab; playing inside lastframe is the fallback.
+  const [embedded, setEmbedded] = useState(false)
+  const [opened, setOpened] = useState<{ source: string; tracked: boolean } | null>(null)
+  const [launchFailed, setLaunchFailed] = useState<string | null>(null)
+  const mountedAt = useRef(Date.now())
 
   // Everything that goes into the player's URL is fixed when it opens, so saving
   // progress or crediting a source never reloads it.
@@ -150,12 +157,12 @@ function Player({ meta, season, episode }: { meta: Meta; season?: number; episod
   // The player never finished loading. A host that answered is probably just a
   // heavy page still pulling in ads, so only time out hosts that didn't.
   useEffect(() => {
-    if (!current || loaded || manual) return
+    if (!embedded || !current || loaded || manual) return
     const t = setTimeout(() => {
       if (statusOf(current.origin, healthStore.get()) !== 'up' && hasAlternative(current.url)) drop([current.url], 'never loaded')
     }, settings.loadTimeout * 1000)
     return () => clearTimeout(t)
-  }, [current, loaded, manual, settings.loadTimeout, hasAlternative, drop])
+  }, [embedded, current, loaded, manual, settings.loadTimeout, hasAlternative, drop])
 
   function notPlaying() {
     if (!current) return
@@ -262,6 +269,35 @@ function Player({ meta, season, episode }: { meta: Meta; season?: number; episod
     return () => clearTimeout(t)
   }, [current, live, engaged, meta])
 
+  // The extension reports from the tab: follow it, unless this page's own
+  // embedded player is the one being watched.
+  useEffect(() => {
+    if (!progress || progress.updatedAt <= mountedAt.current || (embedded && engagedRef.current)) return
+    pos.current = progress.position
+    if (progress.duration) dur.current = progress.duration
+    rerender()
+  }, [progress, embedded, engagedRef])
+
+  function watchInTab() {
+    if (!current) return
+    const p = libraryStore.get()[meta.id]?.progress[key]
+    const resumeAt = p && !p.watched && p.position > 30 ? Math.max(0, p.position - settings.rewind) : 0
+    // rebuild the address with today's spot, for sites that take a start time
+    const url = candidatesFor(current.source, { ...target, startAt: resumeAt }).find((c) => c.host === current.host)?.url ?? current.url
+    setLaunchFailed(null)
+    if (!ext.installed) {
+      // must happen inside the click, or the popup blocker steps in
+      window.open(url, '_blank', 'noopener')
+      setOpened({ source: current.source.name, tracked: false })
+      return
+    }
+    const item = { id: meta.id, type: meta.type, key, name: meta.name, poster: meta.poster, sourceId: current.source.id }
+    launchInTab({ url, item, resumeAt, expectedDuration: parseRuntime(meta.runtime) }).then((ok) => {
+      if (ok) setOpened({ source: current.source.name, tracked: true })
+      else setLaunchFailed(url)
+    })
+  }
+
   function nudge(seconds: number) {
     pos.current = Math.max(0, dur.current ? Math.min(pos.current + seconds, dur.current) : pos.current + seconds)
     setEngaged(true)
@@ -284,6 +320,9 @@ function Player({ meta, season, episode }: { meta: Meta; season?: number; episod
   const watched = !!progress?.watched
   const template = current ? (isMovie ? current.source.movie : current.source.episode) : ''
   const bySource = groupBySource(candidates)
+  const tabLive = progress?.via === 'tab' && Date.now() - progress.updatedAt < 25_000
+  const resumable = progress && !progress.watched && progress.position > 30 ? progress.position : 0
+  const what = isMovie ? meta.name : `${meta.name} ${epLabel(season!, episode!)}`
 
   return (
     <div className="watch">
@@ -315,15 +354,50 @@ function Player({ meta, season, episode }: { meta: Meta; season?: number; episod
       </div>
 
       <div className="player-wrap">
-        {current ? (
+        {current && !embedded ? (
+          <div className="launch" style={meta.background ? { backgroundImage: `url(${meta.background})` } : undefined}>
+            <div className="launch-body">
+              <button className="btn primary big" onClick={watchInTab}>
+                ▶ {resumable ? `Resume at ${clock(resumable)}` : 'Watch'} on {current.source.name}
+              </button>
+              <div className="launch-note">
+                {tabLive ? (
+                  <span className="ok">● Playing in a tab · {clock(progress!.position)}</span>
+                ) : opened?.tracked ? (
+                  <>Opened in a new tab. Press play there; this page follows along by itself.</>
+                ) : opened ? (
+                  <>Opened in a new tab. Without the extension, set your spot below when you stop.</>
+                ) : ext.installed ? (
+                  <>Opens in a new tab{resumable ? ' and jumps to where you stopped' : ''}. Your place comes back here by itself.</>
+                ) : (
+                  <>
+                    Opens in a new tab. <a href={href('/settings')}>Add the lastframe extension</a> and your place is tracked by
+                    itself.
+                  </>
+                )}
+              </div>
+              {launchFailed && (
+                <div className="warn">
+                  The extension didn't answer.{' '}
+                  <a href={launchFailed} target="_blank" rel="noopener noreferrer">
+                    Open it directly
+                  </a>
+                </div>
+              )}
+              <button className="link-btn" onClick={() => setEmbedded(true)}>
+                Play it inside lastframe instead
+              </button>
+            </div>
+          </div>
+        ) : current ? (
           <iframe
             ref={frame}
             key={`${current.url}|${current.source.sandbox}`}
             src={current.url}
             title={`${meta.name} via ${current.source.name}`}
-            allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+            allow="autoplay *; fullscreen *; encrypted-media *; picture-in-picture *"
             allowFullScreen
-            sandbox={current.source.sandbox ? 'allow-scripts allow-same-origin allow-forms allow-presentation allow-pointer-lock' : undefined}
+            sandbox={current.source.sandbox ? EMBED_SANDBOX : undefined}
             onLoad={() => setLoaded(true)}
           />
         ) : (
@@ -378,7 +452,12 @@ function Player({ meta, season, episode }: { meta: Meta; season?: number; episod
             </div>
             {current && (
               <button className="btn small" onClick={notPlaying} title="Skip this source for this title and try the next one">
-                Not playing? Next source →
+                Didn't play? Next source →
+              </button>
+            )}
+            {embedded && current && (
+              <button className="btn small" onClick={() => setEmbedded(false)}>
+                Open in a tab instead
               </button>
             )}
           </div>
@@ -386,13 +465,12 @@ function Player({ meta, season, episode }: { meta: Meta; season?: number; episod
 
         {current && isSearchTemplate(template) && (
           <div className="hint">
-            {current.source.name} opens its own search. Pick{' '}
-            <strong>{isMovie ? meta.name : `${meta.name} ${epLabel(season!, episode!)}`}</strong> in the player. lastframe still keeps
-            your place. If clicking does nothing, the site wants a new tab: turn off the sandbox for this source.
+            {current.source.name} opens its own search: pick <strong>{what}</strong> there.
+            {ext.installed ? ' The extension knows which title the tab is for.' : ''}
           </div>
         )}
 
-        {initial.resumeFrom > 0 && current && (
+        {embedded && initial.resumeFrom > 0 && current && (
           <div className="hint">
             {template.includes('{t}')
               ? `Resuming at ${clock(initial.startAt)}, a few seconds before where you stopped.`
@@ -409,7 +487,17 @@ function Player({ meta, season, episode }: { meta: Meta; season?: number; episod
             {dur.current > 0 && <span className="muted"> / {clock(dur.current)}</span>}
             <ProgressBar value={dur.current ? pos.current / dur.current : 0} className="tracker-bar" />
             <div className="tracker-status">
-              {live ? (
+              {tabLive ? (
+                <span className="ok">● Synced from the tab by the extension</span>
+              ) : !embedded ? (
+                <span>
+                  {opened?.tracked
+                    ? 'Waiting for the video to play in the tab.'
+                    : ext.installed
+                      ? 'Updates by itself while you watch in a tab.'
+                      : 'Set your spot by hand when you stop.'}
+                </span>
+              ) : live ? (
                 <span className="ok">● Synced with the player</span>
               ) : clockOn ? (
                 <span>Clock running. This player doesn't report its time, so pause the clock when you pause.</span>
@@ -421,7 +509,7 @@ function Player({ meta, season, episode }: { meta: Meta; season?: number; episod
             </div>
           </div>
           <div className="tracker-controls">
-            {!live && engaged && settings.estimate && (
+            {embedded && !live && engaged && settings.estimate && (
               <button className="btn small" onClick={() => setClockOn(!clockOn)}>
                 {clockOn ? '❚❚ Pause clock' : '▶ Resume clock'}
               </button>
@@ -450,6 +538,11 @@ function Player({ meta, season, episode }: { meta: Meta; season?: number; episod
     </div>
   )
 }
+
+// Lets the site's own links, dialogs, downloads and new tabs work, but never
+// lets it navigate lastframe's tab away.
+const EMBED_SANDBOX =
+  'allow-scripts allow-same-origin allow-forms allow-presentation allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads'
 
 function SetTime({ onSet }: { onSet: (seconds: number) => void }) {
   const [text, setText] = useState('')

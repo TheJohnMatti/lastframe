@@ -10,6 +10,8 @@ export interface Progress {
   watched: boolean
   updatedAt: number
   estimated?: boolean // position came from the on-page clock, not the player
+  url?: string // the page it was last watched on, as the extension saw it
+  via?: 'tab' | 'page' // measured by the extension in a tab, or on lastframe's own page
 }
 
 export interface LibraryItem {
@@ -93,9 +95,45 @@ export function recordProgress(meta: MetaPreview, key: string, position: number,
       watched: (prev?.watched ?? false) || reached,
       updatedAt: Date.now(),
       estimated,
+      url: prev?.url,
+      via: 'page',
     }
     return { ...item, last: key, lastWatchedAt: Date.now(), progress: { ...item.progress, [key]: next } }
   })
+}
+
+// Progress the browser extension measured in a tab. Newer wins, so merging
+// the same snapshot twice, or after a manual edit, changes nothing.
+export function applyExternalProgress(
+  meta: MetaPreview,
+  key: string,
+  ext: { position: number; duration: number; updatedAt: number; url?: string },
+): boolean {
+  const current = libraryStore.get()[meta.id]?.progress[key]
+  if (current && current.updatedAt >= ext.updatedAt) return false
+  const threshold = settingsStore.get().watchedAt
+  update(meta, (item) => {
+    const prev = item.progress[key]
+    const reached = ext.duration > 0 && ext.position / ext.duration >= threshold
+    const newest = ext.updatedAt >= (item.lastWatchedAt ?? 0)
+    return {
+      ...item,
+      last: newest ? key : item.last,
+      lastWatchedAt: Math.max(item.lastWatchedAt ?? 0, ext.updatedAt),
+      progress: {
+        ...item.progress,
+        [key]: {
+          position: Math.round(ext.position),
+          duration: Math.round(ext.duration),
+          watched: (prev?.watched ?? false) || reached,
+          updatedAt: ext.updatedAt,
+          url: ext.url ?? prev?.url,
+          via: 'tab',
+        },
+      },
+    }
+  })
+  return true
 }
 
 export function setWatched(meta: MetaPreview, keys: string[], watched: boolean) {
@@ -109,6 +147,7 @@ export function setWatched(meta: MetaPreview, keys: string[], watched: boolean) 
         duration: prev?.duration ?? 0,
         watched,
         updatedAt: Date.now(),
+        url: prev?.url,
       }
     }
     // Marking things watched moves your place forward to the furthest of them.

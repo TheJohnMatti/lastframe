@@ -107,7 +107,7 @@ export function Sources({ grab }: { grab?: string | null }) {
                 <div className="source-name">
                   <span className="muted">{i + 1}.</span> {s.name}
                   {!s.enabled && <span className="pill">off</span>}
-                  {s.sandbox && <span className="pill" title="Popups and redirects out of the player are blocked">sandboxed</span>}
+                  {s.sandbox && <span className="pill" title="Played inside lastframe, it can't redirect lastframe's tab">sandboxed</span>}
                   {(isSearchTemplate(s.movie) || isSearchTemplate(s.episode)) && (
                     <span className="pill" title="Opens the site's search; you pick the title in the player">search mode</span>
                   )}
@@ -250,7 +250,7 @@ function SourceForm({ initial, onSave, onCancel }: { initial?: Source; onSave: (
       </label>
       <label className="check-row">
         <input type="checkbox" checked={sandbox} onChange={(e) => setSandbox(e.target.checked)} />
-        Sandbox the player: block popups, new tabs and redirects. Turn off only if a site refuses to play inside it.
+        When played inside lastframe, keep the site from redirecting lastframe's tab. Turn off only if a site refuses to play inside it.
       </label>
       {usesHost && !hosts.trim() && <div className="warn">The templates use {'{host}'} but no hosts are listed.</div>}
       {preview.length > 0 && (

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { ConfirmButton } from '../components/ui'
+import { useExtension } from '../lib/extension'
 import { libraryStore, settingsStore, type Settings as SettingsShape } from '../lib/library'
 import { download, exportAll, importAll } from '../lib/backup'
 import { healthStore } from '../lib/sources'
@@ -14,6 +15,7 @@ export function Settings() {
   const [mode, setMode] = useState<'merge' | 'replace'>('merge')
   const [message, setMessage] = useState('')
   const fileInput = useRef<HTMLInputElement>(null)
+  const ext = useExtension()
 
   async function restore(file: File) {
     try {
@@ -30,6 +32,37 @@ export function Settings() {
         <h1>Settings</h1>
       </div>
       {message && <div className="notice" onClick={() => setMessage('')}>{message}</div>}
+
+      <section className="panel" id="extension">
+        <h2>Browser extension</h2>
+        {ext.installed ? (
+          <p>
+            <span className="ok">● Connected</span> (version {ext.version}). Sites you open from lastframe are followed in their tab:
+            your place is saved while you watch, and reopening resumes where you stopped.
+          </p>
+        ) : (
+          <>
+            <p className="muted">
+              Not detected. Without it, lastframe opens sites in a tab but can't see the video, so you set your place by hand.
+              It takes a minute, once, in Chrome or another Chromium browser:
+            </p>
+            <ol className="steps">
+              <li>
+                Open <code>chrome://extensions</code> in a new tab (paste it into the address bar).
+              </li>
+              <li>Turn on <strong>Developer mode</strong>, top right.</li>
+              <li>
+                Click <strong>Load unpacked</strong> and choose the <code>extension</code> folder inside your lastframe folder.
+              </li>
+              <li>Come back here and reload this page.</li>
+            </ol>
+          </>
+        )}
+        <p className="muted">
+          The extension only reports on tabs lastframe opened, and keeps everything in your browser. After you pull a new
+          version, press the reload arrow on its card in <code>chrome://extensions</code>.
+        </p>
+      </section>
 
       <section className="panel">
         <h2>Tracking</h2>
@@ -71,7 +104,7 @@ export function Settings() {
         </label>
         <label className="check-row">
           <input type="checkbox" checked={settings.sandboxDefault} onChange={(e) => set('sandboxDefault', e.target.checked)} />
-          Sandbox new sources by default (blocks popup ads and redirects).
+          Sandbox new sources by default (when played inside lastframe, a site can't redirect lastframe's tab).
         </label>
         <button className="btn small" onClick={() => healthStore.set({})}>Forget which sites were down</button>
       </section>

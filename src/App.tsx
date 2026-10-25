@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { href, navigate, useRoute } from './lib/router'
 import { loadLocalSourceFile, sourcesStore } from './lib/sources'
+import { connectExtension } from './lib/extension'
 import type { MediaType } from './lib/meta'
 import { Home } from './pages/Home'
 import { Search } from './pages/Search'
@@ -19,6 +20,7 @@ export default function App() {
 
   useEffect(() => {
     loadLocalSourceFile()
+    connectExtension()
   }, [])
 
   useEffect(() => {
