@@ -17,6 +17,7 @@ import {
 import {
   candidatesFor,
   healthStore,
+  isSearchTemplate,
   orderSources,
   probe,
   sourcesStore,
@@ -358,6 +359,14 @@ function Player({ meta, season, episode }: { meta: Meta; season?: number; episod
                 Not playing? Next source →
               </button>
             )}
+          </div>
+        )}
+
+        {current && isSearchTemplate(template) && (
+          <div className="hint">
+            {current.source.name} opens its own search. Pick{' '}
+            <strong>{isMovie ? meta.name : `${meta.name} ${epLabel(season!, episode!)}`}</strong> in the player. lastframe still keeps
+            your place. If clicking does nothing, the site wants a new tab: turn off the sandbox for this source.
           </div>
         )}
 

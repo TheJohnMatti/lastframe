@@ -1,4 +1,13 @@
-import { normalizeSource, SAMPLE_EPISODE, SAMPLE_MOVIE, siteName, sourcesStore, templateFromExample, type Target } from './sources'
+import {
+  normalizeSource,
+  SAMPLE_EPISODE,
+  SAMPLE_MOVIE,
+  searchTemplateFromExample,
+  siteName,
+  sourcesStore,
+  templateFromExample,
+  type Target,
+} from './sources'
 
 // What the bookmarklet sends back from the page it was clicked on.
 export interface GrabPayload {
@@ -17,7 +26,6 @@ var r=f.getBoundingClientRect(),s=f.src||f.getAttribute('data-src')||f.getAttrib
 if(/^https?:/.test(s))out.push({src:s,w:Math.round(r.width),h:Math.round(r.height)});
 if(depth<3){try{walk(f.contentDocument,depth+1,out)}catch(e){}}});return out}
 var d={page:location.href,title:document.title.slice(0,120),frames:walk(document,0,[]).slice(0,25)};
-if(!d.frames.length){alert('lastframe: no embedded player on this page yet. Press play first, then click the bookmark again.');return}
 window.open(${JSON.stringify(appUrl)}+'#/sources?grab='+encodeURIComponent(JSON.stringify(d)),'lastframe')})()`
   return `javascript:${encodeURIComponent(code.replace(/\n/g, ''))}`
 }
@@ -58,12 +66,17 @@ export function applyGrab(grab: GrabPayload): { ok: boolean; message: string } {
   }
 
   if (!found.length) {
+    // No player address carries the title's id: fall back to the site's own search.
+    for (const [, sample] of tries) {
+      const d = searchTemplateFromExample(grab.page, sample)
+      if ('template' in d) return applySearch(d.template, d.host)
+    }
     const where = grab.title ? `“${grab.title}”` : 'that page'
     return {
       ok: false,
       message: frames.length
-        ? `Found ${frames.length} embedded frame${frames.length === 1 ? '' : 's'} on ${where}, but none is a player for The Dark Knight or Breaking Bad S3 E7. Open one of those two on the site, press play, and grab again.`
-        : `No embedded player on ${where}. Press play first; if there's still none, the site plays video itself and can't be wrapped.`,
+        ? `The player on ${where} doesn't use the title's IMDb or TMDB id in its address (the site uses its own codes), so it can't be turned into a template. Use search mode instead: search the site for “The Dark Knight” and click the bookmark on the results page.`
+        : `No embedded player on ${where}. Press play first, or search the site for “The Dark Knight” and click the bookmark on the results page to use search mode.`,
     }
   }
 
@@ -87,4 +100,21 @@ export function applyGrab(grab: GrabPayload): { ok: boolean; message: string } {
   if (source?.movie)
     return { ok: true, message: `Added ${name} for movies. Open Breaking Bad S3 E7 on the same site and grab again to add episodes.` }
   return { ok: true, message: `Added ${name} for episodes. Open The Dark Knight on the same site and grab again to add movies.` }
+}
+
+// One search template serves movies and episodes alike: it searches for the title.
+function applySearch(template: string, host: string): { ok: boolean; message: string } {
+  let name = siteName(host)
+  sourcesStore.set((st) => {
+    const at = st.sources.findIndex((s) => s.hosts.includes(host))
+    if (at >= 0) {
+      name = st.sources[at].name
+      return { ...st, sources: st.sources.map((s, i) => (i === at ? { ...s, movie: template, episode: template, enabled: true } : s)) }
+    }
+    return { ...st, sources: [...st.sources, normalizeSource({ name, hosts: [host], movie: template, episode: template })!] }
+  })
+  return {
+    ok: true,
+    message: `Added ${name} in search mode: it opens the site's search for whatever you play, and you click the right episode there. lastframe still keeps your place.`,
+  }
 }

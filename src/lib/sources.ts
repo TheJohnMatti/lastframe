@@ -38,7 +38,8 @@ export const TEMPLATE_VARS: [string, string][] = [
   ['{episode}', 'episode number'],
   ['{t}', 'seconds to resume from (0 when starting fresh)'],
   ['{type}', '"movie" or "tv"'],
-  ['{title}', 'URL-encoded title'],
+  ['{title}', 'URL-encoded title (spaces as %20)'],
+  ['{q}', 'title with spaces as +, as most search boxes send it'],
   ['{slug}', 'title as a lowercase-hyphenated slug'],
   ['{year}', 'first release year'],
 ]
@@ -137,6 +138,7 @@ export function candidatesFor(source: Source, target: Target): Candidate[] {
     t: String(Math.floor(target.startAt)),
     type: target.type === 'movie' ? 'movie' : 'tv',
     title: encodeURIComponent(target.title),
+    q: encodeURIComponent(target.title).replace(/%20/g, '+'),
     slug: target.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
     year: target.year?.match(/\d{4}/)?.[0],
   }
@@ -232,6 +234,7 @@ export function originsOf(source: Source): string[] {
 }
 
 export function siteName(host: string): string {
+  if (/^[\d.:[\]]+$/.test(host)) return host
   const labels = host.replace(/:\d+$/, '').replace(/^www\./, '').split('.')
   const label = labels.length > 1 ? labels[labels.length - 2] : labels[0]
   return label.charAt(0).toUpperCase() + label.slice(1)
@@ -243,14 +246,8 @@ export type Derived = { template: string; host: string } | { error: string }
 // become {imdb}/{tmdb}, its season and episode numbers {season}/{episode},
 // and its domain {host}.
 export function templateFromExample(raw: string, sample: Target): Derived {
-  let url: URL
-  try {
-    const text = raw.trim()
-    url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`)
-    if (!url.hostname.includes('.') && url.hostname !== 'localhost') throw new Error('no domain')
-  } catch {
-    return { error: 'Paste the whole address, starting with https://' }
-  }
+  const url = toUrl(raw)
+  if (!url) return { error: 'Paste the whole address, starting with https://' }
   const whole = (n: string) => new RegExp(`(^|[^0-9])${n}(?![0-9])`, 'g')
   let path = url.pathname + url.search + url.hash
   const hasImdb = path.includes(sample.imdb)
@@ -281,3 +278,54 @@ export function templateFromExample(raw: string, sample: Target): Derived {
   path = path.replace(/([?&](?:t|start|startat|time|progress|resume|resumeat)=)\d+/i, '$1{t}')
   return { template: `${url.protocol}//{host}${path}`, host: url.host }
 }
+
+function toUrl(raw: string): URL | null {
+  try {
+    const text = raw.trim()
+    const url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`)
+    return url.hostname.includes('.') || url.hostname === 'localhost' ? url : null
+  } catch {
+    return null
+  }
+}
+
+const SEARCH_PAGE = /search|find|keyword|query|[?&](q|s|k|kw|term)=/i
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+// For sites whose player addresses are opaque per-title codes: a search page
+// for the sample title becomes a template that opens the site's own search,
+// and you pick the episode inside the player frame.
+export function searchTemplateFromExample(raw: string, sample: Target): Derived {
+  const url = toUrl(raw)
+  if (!url) return { error: 'Paste the whole address, starting with https://' }
+  let path = url.pathname + url.search + url.hash
+  if (!SEARCH_PAGE.test(path)) return { error: `That isn't a search page. Search the site for “${sample.title}” and use the results page's address.` }
+  const words = sample.title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(escapeRe)
+  const forms: [RegExp, string][] = [
+    [new RegExp(words.join('(?:%20|\\s)+'), 'i'), '{title}'],
+    [new RegExp(words.join('\\+'), 'i'), '{q}'],
+    [new RegExp(words.join('[-_]'), 'i'), '{slug}'],
+  ]
+  for (const [re, placeholder] of forms) {
+    if (re.test(path)) {
+      path = path.replace(re, placeholder)
+      return { template: `${url.protocol}//{host}${path}`, host: url.host }
+    }
+  }
+  return { error: `That search page isn't for “${sample.title}”. Search for exactly that title and try again.` }
+}
+
+// Ids first; a search page when there are none.
+export function deriveTemplate(raw: string, sample: Target): Derived {
+  const byId = templateFromExample(raw, sample)
+  if ('template' in byId) return byId
+  const bySearch = searchTemplateFromExample(raw, sample)
+  return 'template' in bySearch ? bySearch : byId
+}
+
+export const isSearchTemplate = (t: string) => !!t && !/\{(imdb|tmdb)\}/.test(t) && /\{(title|q|slug)\}/.test(t)

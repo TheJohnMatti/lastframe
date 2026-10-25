@@ -17,7 +17,8 @@ import {
   sourcesStore,
   statusOf,
   TEMPLATE_VARS,
-  templateFromExample,
+  deriveTemplate,
+  isSearchTemplate,
   type Source,
   type Target,
 } from '../lib/sources'
@@ -107,6 +108,9 @@ export function Sources({ grab }: { grab?: string | null }) {
                   <span className="muted">{i + 1}.</span> {s.name}
                   {!s.enabled && <span className="pill">off</span>}
                   {s.sandbox && <span className="pill" title="Popups and redirects out of the player are blocked">sandboxed</span>}
+                  {(isSearchTemplate(s.movie) || isSearchTemplate(s.episode)) && (
+                    <span className="pill" title="Opens the site's search; you pick the title in the player">search mode</span>
+                  )}
                 </div>
                 <div className="source-hosts">
                   {originsOf(s).map((o) => {
@@ -270,7 +274,7 @@ function SourceForm({ initial, onSave, onCancel }: { initial?: Source; onSave: (
 
 function FromExample({ sample, label, onDerived }: { sample: Target; label: string; onDerived: (d: { template: string; host: string }) => void }) {
   const [text, setText] = useState('')
-  const result = text.trim() ? templateFromExample(text, sample) : null
+  const result = text.trim() ? deriveTemplate(text, sample) : null
   return (
     <div className="example">
       <label>
@@ -283,7 +287,7 @@ function FromExample({ sample, label, onDerived }: { sample: Target; label: stri
           placeholder="https://…"
           onChange={(e) => {
             setText(e.target.value)
-            const r = templateFromExample(e.target.value, sample)
+            const r = deriveTemplate(e.target.value, sample)
             if ('template' in r) onDerived(r)
           }}
         />
@@ -336,7 +340,9 @@ function GrabPanel() {
       </ol>
       <p className="muted">
         The bookmark reads the players embedded in the page, so blocked right-click and devtools don't matter. What it
-        finds goes only to this tab.
+        finds goes only to this tab. If a site's players use its own codes instead of the title's id, search the site
+        for “The Dark Knight” and click the bookmark on the results page: the source then works in search mode, opening
+        the site's search for each title so you click the right episode there.
       </p>
     </section>
   )

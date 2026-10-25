@@ -31,7 +31,7 @@ https://{host}/embed/tv/{imdb}/{season}/{episode}
 | `{season}` / `{episode}` | episode numbers |
 | `{t}` | seconds to resume from, for sites that accept a start time |
 | `{type}` | `movie` or `tv` |
-| `{title}` / `{slug}` / `{year}` | for sites that use names in URLs |
+| `{title}` / `{q}` / `{slug}` / `{year}` | for sites that use names in URLs (`{q}` has spaces as `+`, like most search boxes) |
 
 You can add sources in three ways:
 
@@ -42,6 +42,10 @@ You can add sources in three ways:
 - **Import JSON**: load a list you keep somewhere private.
 
 To try lastframe without a real source, use the demo source in `sources.example.json`. It points at `public/demo/player.html`, a stand-in player that plays nothing but reports its time the way real embeds do.
+
+### Sites whose players use their own codes
+
+Some sites address their players with per-title codes instead of the IMDb or TMDB id, so there's nothing to turn into a template. lastframe doesn't try to crack those. For such a site, search it for *The Dark Knight* and click the bookmark on the results page. The source then works in **search mode**: playing anything opens the site's own search for that title inside the player, you click the right episode there, and lastframe still keeps your place. If clicking a result does nothing, the site wants to open a new tab, so turn off the sandbox for that source. Sites that refuse to be shown inside another page won't work at all.
 
 ### How fallback works
 
