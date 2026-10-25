@@ -38,6 +38,8 @@ export function Watch({ type, id, season, episode }: { type: MediaType; id: stri
   return <Player key={`${id}/${season}/${episode}`} meta={meta.data} season={season} episode={episode} />
 }
 
+type Failure = 'unreachable' | 'never loaded' | 'not playing'
+
 function useRefState<T>(initial: T) {
   const [value, setValue] = useState(initial)
   const ref = useRef(initial)
@@ -84,7 +86,8 @@ function Player({ meta, season, episode }: { meta: Meta; season?: number; episod
   const [exhausted, setExhausted] = useState(false)
   const [manual, setManual] = useState(false)
   const [loaded, setLoaded] = useState(false)
-  const skipped = useRef<Set<string>>(new Set())
+  // why each player was dropped; only "not playing" (your word) rules one out for good
+  const failures = useRef<Map<string, Failure>>(new Map())
   const current = candidates.find((c) => c.url === currentUrl)
 
   const [live, setLive, liveRef] = useRefState(false)
@@ -109,15 +112,25 @@ function Player({ meta, season, episode }: { meta: Meta; season?: number; episod
     setExhausted(!c)
   }, [setLive])
 
-  const pickNext = useCallback(() => {
-    const h = healthStore.get()
-    show(candidates.find((c) => !skipped.current.has(c.url) && statusOf(c.origin, h) !== 'down'), false)
-  }, [candidates, show])
+  const viable = useCallback(
+    (c: Candidate) => !failures.current.has(c.url) && statusOf(c.origin, healthStore.get()) !== 'down',
+    [],
+  )
 
-  const skip = useCallback((urls: string[]) => {
-    urls.forEach((u) => skipped.current.add(u))
+  // Best: untried and reachable. Then anything you haven't ruled out, because
+  // the reachability check and the load timer can both be wrong about a site.
+  const pickNext = useCallback(() => {
+    const open = candidates.filter((c) => failures.current.get(c.url) !== 'not playing')
+    show(open.find(viable) ?? open.find((c) => !failures.current.has(c.url)) ?? open[0], false)
+  }, [candidates, show, viable])
+
+  const drop = useCallback((urls: string[], why: Failure) => {
+    urls.forEach((u) => failures.current.set(u, why))
     pickNext()
   }, [pickNext])
+
+  // Automatic drops only happen when there's something better to switch to.
+  const hasAlternative = useCallback((url: string) => candidates.some((c) => c.url !== url && viable(c)), [candidates, viable])
 
   useEffect(() => {
     for (const origin of new Set(candidates.map((c) => c.origin))) {
@@ -129,23 +142,26 @@ function Player({ meta, season, episode }: { meta: Meta; season?: number; episod
     if (!current && !exhausted && candidates.length) pickNext()
   }, [current, exhausted, candidates, pickNext])
 
-  // The host behind the current player turned out to be unreachable.
+  // The host behind the current player didn't answer the reachability check.
   useEffect(() => {
-    if (current && !manual && statusOf(current.origin, health) === 'down') skip([current.url])
-  }, [health, current, manual, skip])
+    if (current && !manual && statusOf(current.origin, health) === 'down' && hasAlternative(current.url)) drop([current.url], 'unreachable')
+  }, [health, current, manual, hasAlternative, drop])
 
-  // The player never finished loading.
+  // The player never finished loading. A host that answered is probably just a
+  // heavy page still pulling in ads, so only time out hosts that didn't.
   useEffect(() => {
     if (!current || loaded || manual) return
-    const t = setTimeout(() => skip([current.url]), settings.loadTimeout * 1000)
+    const t = setTimeout(() => {
+      if (statusOf(current.origin, healthStore.get()) !== 'up' && hasAlternative(current.url)) drop([current.url], 'never loaded')
+    }, settings.loadTimeout * 1000)
     return () => clearTimeout(t)
-  }, [current, loaded, manual, settings.loadTimeout, skip])
+  }, [current, loaded, manual, settings.loadTimeout, hasAlternative, drop])
 
   function notPlaying() {
     if (!current) return
     markSourceFailed(meta, current.source.id)
     // the title is missing from that site, so its other mirrors won't have it either
-    skip(candidates.filter((c) => c.source.id === current.source.id).map((c) => c.url))
+    drop(candidates.filter((c) => c.source.id === current.source.id).map((c) => c.url), 'not playing')
   }
 
   function chooseSource(sourceId: string) {
@@ -155,7 +171,7 @@ function Player({ meta, season, episode }: { meta: Meta; season?: number; episod
   }
 
   function retryAll() {
-    skipped.current.clear()
+    failures.current.clear()
     for (const origin of new Set(candidates.map((c) => c.origin))) probe(origin)
     show(candidates[0], false)
   }
@@ -323,8 +339,8 @@ function Player({ meta, season, episode }: { meta: Meta; season?: number; episod
                 <a className="btn" href={href('/sources')}>Edit sources</a>
               </Empty>
             ) : exhausted ? (
-              <Empty title="Every source failed for this one">
-                <p>They were unreachable, never loaded, or you marked them as not playing.</p>
+              <Empty title="You marked every source as not playing">
+                <p>None of your sources had this one. Try them again, or add another site.</p>
                 <div className="actions center">
                   <button className="btn primary" onClick={retryAll}>Try them all again</button>
                   <a className="btn" href={href('/sources')}>Manage sources</a>
@@ -345,8 +361,14 @@ function Player({ meta, season, episode }: { meta: Meta; season?: number; episod
               {bySource.map(({ source, items }) => {
                 const active = current?.source.id === source.id
                 const shown = active ? current! : items[0]
+                const why = items.map((c) => failures.current.get(c.url)).find(Boolean)
                 return (
-                  <button key={source.id} className={`chip${active ? ' active' : ''}`} onClick={() => chooseSource(source.id)}>
+                  <button
+                    key={source.id}
+                    className={`chip${active ? ' active' : ''}`}
+                    title={why ? `Dropped: ${why}. Click to load it anyway.` : `Load ${source.name}`}
+                    onClick={() => chooseSource(source.id)}
+                  >
                     <StatusDot status={statusOf(shown.origin, health)} />
                     {source.name}
                     {active && current?.host && items.length > 1 && <span className="chip-host">{current.host}</span>}

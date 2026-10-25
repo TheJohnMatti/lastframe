@@ -190,7 +190,7 @@ export function statusOf(origin: string, health: Record<string, Health>): Status
 // Can the site be reached at all? An opaque no-cors request resolves for any
 // HTTP answer and rejects on DNS failure, refused connections and timeouts,
 // which is how these sites usually die. It can't tell whether a title plays.
-export function probe(origin: string, timeoutMs = 7000): Promise<Health> {
+export function probe(origin: string, timeoutMs = 12000): Promise<Health> {
   const running = inFlight.get(origin)
   if (running) return running
   const job = (async () => {
@@ -200,7 +200,6 @@ export function probe(origin: string, timeoutMs = 7000): Promise<Health> {
     let ok = false
     try {
       await fetch(`${origin}/`, {
-        method: 'HEAD',
         mode: 'no-cors',
         cache: 'no-store',
         credentials: 'omit',
