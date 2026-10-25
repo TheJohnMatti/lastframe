@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>lastframe</title>
+<style>
+  :root { color-scheme: dark; --bg: #0b0c10; --surface: #14161c; --surface-2: #1c1f27; --border: #272b36; --text: #eceef3; --muted: #959bab; --accent: #f2b544; --ok: #4ade80; }
+  * { box-sizing: border-box; }
+  body { margin: 0; width: 340px; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, sans-serif; }
+  header { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border); font-weight: 700; }
+  header em { font-style: normal; color: var(--accent); }
+  main { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .status { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .status strong { display: block; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .ok { color: var(--ok); }
+  input, select { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; outline: none; }
+  input:focus, select:focus { border-color: var(--accent); }
+  button { font: inherit; font-weight: 600; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #1b1405; }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .results { display: flex; flex-direction: column; gap: 4px; max-height: 210px; overflow-y: auto; }
+  .result { display: flex; gap: 8px; align-items: center; text-align: left; padding: 6px; background: transparent; border-color: transparent; font-weight: 500; }
+  .result:hover, .result.on { background: var(--surface); border-color: var(--border); }
+  .result img { width: 28px; height: 42px; object-fit: cover; border-radius: 4px; background: var(--surface-2); flex: none; }
+  .result span { display: block; }
+  label.check { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); }
+  label.check input { width: auto; accent-color: var(--accent); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>last<em>frame</em></header>
+<main>
+  <div class="status" id="status">…</div>
+  <section id="linker" hidden>
+    <div class="muted" id="linker-title" style="margin-bottom:6px">Track this tab as:</div>
+    <input id="query" placeholder="Search a movie or show" autocomplete="off" />
+    <div class="results" id="results" style="margin-top:6px"></div>
+    <div class="row" id="episode-row" hidden style="margin-top:8px">
+      <select id="season" aria-label="Season"></select>
+      <select id="episode" aria-label="Episode"></select>
+    </div>
+    <label class="check" style="margin-top:8px"><input type="checkbox" id="remember" checked /> Remember this page next time</label>
+    <div class="row" style="margin-top:8px">
+      <button class="primary" id="link" disabled>Track this tab</button>
+    </div>
+  </section>
+</main>
+<script src="popup.js"></script>
+</body>
+</html>

@@ -22,8 +22,10 @@ export interface LibraryItem {
   background?: string
   year?: string
   watchlist: boolean
+  watchlistAt?: number // when it was last added to or taken off the watchlist
   addedAt: number
   lastWatchedAt?: number
+  droppedAt?: number // taken off Continue watching; watching again brings it back
   last?: string // progress key of the most recent activity
   progress: Record<string, Progress>
   preferredSource?: string // source id that last played this title
@@ -49,6 +51,8 @@ export const DEFAULT_SETTINGS: Settings = {
 }
 
 export const libraryStore = createStore<Library>('lastframe.library.v1', () => ({}))
+// Titles you forgot, and when, so a synced copy doesn't bring them back.
+export const removedStore = createStore<Record<string, number>>('lastframe.removed.v1', () => ({}))
 export const settingsStore = createStore<Settings>('lastframe.settings.v1', () => DEFAULT_SETTINGS, (raw) => ({
   ...DEFAULT_SETTINGS,
   ...(raw as Partial<Settings>),
@@ -76,7 +80,7 @@ function update(meta: MetaPreview, fn: (item: LibraryItem) => LibraryItem) {
 }
 
 export function toggleWatchlist(meta: MetaPreview) {
-  update(meta, (item) => ({ ...item, watchlist: !item.watchlist, addedAt: item.watchlist ? item.addedAt : Date.now() }))
+  update(meta, (item) => ({ ...item, watchlist: !item.watchlist, watchlistAt: Date.now() }))
 }
 
 // Opening the player counts as starting it, so it shows up under Continue watching.
@@ -164,15 +168,24 @@ export function markUpTo(meta: Meta, ep: Episode) {
 }
 
 export function dropFromContinue(id: string) {
-  libraryStore.set((lib) => (lib[id] ? { ...lib, [id]: { ...lib[id], lastWatchedAt: undefined } } : lib))
+  libraryStore.set((lib) => (lib[id] ? { ...lib, [id]: { ...lib[id], droppedAt: Date.now() } } : lib))
 }
 
+export const inContinue = (item: LibraryItem) => !!item.lastWatchedAt && item.lastWatchedAt > (item.droppedAt ?? 0)
+
 export function removeFromLibrary(id: string) {
+  removedStore.set((r) => ({ ...r, [id]: Date.now() }))
   libraryStore.set((lib) => {
     const next = { ...lib }
     delete next[id]
     return next
   })
+}
+
+export function eraseHistory() {
+  const now = Date.now()
+  removedStore.set((r) => ({ ...r, ...Object.fromEntries(Object.keys(libraryStore.get()).map((id) => [id, now])) }))
+  libraryStore.set({})
 }
 
 export function setPreferredSource(meta: MetaPreview, sourceId: string) {

@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Card, Row, Empty } from '../components/ui'
 import { useAsync, useMetas, type Async } from '../lib/hooks'
 import { catalog, type Meta, type MetaPreview } from '../lib/meta'
-import { dropFromContinue, libraryStore, MOVIE_KEY, nextUp, type Library, type LibraryItem } from '../lib/library'
+import { dropFromContinue, inContinue, libraryStore, MOVIE_KEY, nextUp, type Library, type LibraryItem } from '../lib/library'
 import { epLabel, minutesLeft } from '../lib/format'
 import { href, titlePath, watchPath } from '../lib/router'
 import { sourcesStore } from '../lib/sources'
@@ -17,7 +17,7 @@ interface ContinueEntry {
 export function continueEntries(library: Library, metas: Record<string, Meta>): ContinueEntry[] {
   const out: ContinueEntry[] = []
   const recent = Object.values(library)
-    .filter((i) => i.lastWatchedAt)
+    .filter(inContinue)
     .sort((a, b) => (b.lastWatchedAt ?? 0) - (a.lastWatchedAt ?? 0))
   for (const item of recent) {
     if (item.type === 'movie') {
@@ -53,7 +53,7 @@ export function Home() {
   const library = libraryStore.use()
   const { sources } = sourcesStore.use()
   const seriesInProgress = useMemo(
-    () => Object.values(library).filter((i) => i.type === 'series' && i.lastWatchedAt),
+    () => Object.values(library).filter((i) => i.type === 'series' && inContinue(i)),
     [library],
   )
   const metas = useMetas(seriesInProgress)

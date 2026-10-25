@@ -1,24 +1,56 @@
 {
   "manifest_version": 3,
   "name": "lastframe",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Remembers where you are in what you watch, for the lastframe app on localhost:5178.",
   "minimum_chrome_version": "116",
-  "permissions": ["storage", "scripting"],
-  "host_permissions": ["http://*/*", "https://*/*"],
-  "background": { "service_worker": "background.js" },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "lastframe",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "permissions": [
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
-      "matches": ["http://*/*", "https://*/*"],
-      "js": ["detector.js"],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "detector.js"
+      ],
       "all_frames": true,
       "match_about_blank": true,
       "match_origin_as_fallback": true,
       "run_at": "document_start"
     },
     {
-      "matches": ["http://localhost:5178/*", "http://127.0.0.1:5178/*"],
-      "js": ["bridge.js"],
+      "matches": [
+        "http://localhost:5178/*",
+        "http://127.0.0.1:5178/*"
+      ],
+      "js": [
+        "bridge.js"
+      ],
       "run_at": "document_start"
     }
   ]

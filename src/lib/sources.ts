@@ -19,6 +19,7 @@ export interface SourcesState {
   sources: Source[]
   seeded: boolean // sources.local.json has been looked for
   lastWorking?: string // source id that most recently played anything
+  updatedAt?: number // when the list itself last changed, for syncing devices
 }
 
 export interface Health {

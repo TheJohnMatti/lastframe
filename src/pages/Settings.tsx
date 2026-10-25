@@ -1,7 +1,9 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import QRCode from 'qrcode'
 import { ConfirmButton } from '../components/ui'
 import { useExtension } from '../lib/extension'
-import { libraryStore, settingsStore, type Settings as SettingsShape } from '../lib/library'
+import { isThisComputer, pairInfo, useSync, type PairInfo } from '../lib/sync'
+import { eraseHistory, libraryStore, settingsStore, type Settings as SettingsShape } from '../lib/library'
 import { download, exportAll, importAll } from '../lib/backup'
 import { healthStore } from '../lib/sources'
 
@@ -33,9 +35,16 @@ export function Settings() {
       </div>
       {message && <div className="notice" onClick={() => setMessage('')}>{message}</div>}
 
+      <PhonePanel />
+
       <section className="panel" id="extension">
         <h2>Browser extension</h2>
-        {ext.installed ? (
+        {!isThisComputer() && !ext.installed ? (
+          <p className="muted">
+            Extensions need desktop Chrome. On a phone, lastframe opens sites in a tab and you set your place by hand; it syncs
+            with your Mac either way.
+          </p>
+        ) : ext.installed ? (
           <p>
             <span className="ok">● Connected</span> (version {ext.version}). Sites you open from lastframe are followed in their tab:
             your place is saved while you watch, and reopening resumes where you stopped.
@@ -137,11 +146,92 @@ export function Settings() {
           />
         </div>
         <div className="actions">
-          <ConfirmButton className="btn ghost danger" ask="Erase all history and the watchlist?" onConfirm={() => libraryStore.set({})}>
+          <ConfirmButton className="btn ghost danger" ask="Erase all history and the watchlist?" onConfirm={eraseHistory}>
             Erase watch history
           </ConfirmButton>
         </div>
       </section>
     </div>
+  )
+}
+
+function PhonePanel() {
+  const sync = useSync()
+  const here = isThisComputer()
+  const [info, setInfo] = useState<PairInfo | null | undefined>(undefined)
+  const [qr, setQr] = useState('')
+
+  useEffect(() => {
+    if (here) pairInfo().then(setInfo)
+  }, [here])
+
+  useEffect(() => {
+    const url = info?.urls[0]
+    if (url) QRCode.toString(url, { type: 'svg', margin: 1, width: 196, color: { dark: '#0b0c10', light: '#ffffff' } }).then(setQr)
+  }, [info])
+
+  const last = sync.lastSync ? new Date(sync.lastSync).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : null
+
+  if (!here) {
+    return (
+      <section className="panel" id="phone">
+        <h2>This device</h2>
+        {sync.paired ? (
+          <p>
+            <span className="ok">● Synced with your Mac</span>
+            {last ? `, last at ${last}` : ''}. History, watchlist and sources are shared both ways.
+          </p>
+        ) : sync.available ? (
+          <p className="muted">Not paired yet. On your Mac, open Settings in lastframe and scan the code with this phone's camera.</p>
+        ) : (
+          <p className="muted">Can't reach your Mac{sync.error ? ` (${sync.error})` : ''}. Both need to be on the same Wi-Fi.</p>
+        )}
+      </section>
+    )
+  }
+
+  return (
+    <section className="panel" id="phone">
+      <h2>Use it on your phone</h2>
+      {info === undefined ? (
+        <p className="muted">Checking…</p>
+      ) : info === null ? (
+        <p className="muted">Phone access needs lastframe's own server: start it with <code>npm run phone</code>.</p>
+      ) : !info.lan ? (
+        <>
+          <p className="muted">Your phone can't reach this Mac yet, because lastframe is only listening to this computer.</p>
+          <ol className="steps">
+            <li>
+              Stop lastframe (Ctrl-C where it runs) and start it with <code>npm run phone</code> instead of <code>npm run dev</code>.
+            </li>
+            <li>If macOS asks whether node may accept incoming connections, click Allow.</li>
+            <li>Reload this page: a code to scan appears here.</li>
+          </ol>
+        </>
+      ) : (
+        <div className="pair">
+          {qr && <div className="qr" aria-label="QR code that opens lastframe on your phone" dangerouslySetInnerHTML={{ __html: qr }} />}
+          <div>
+            <p>
+              Scan this with your phone's camera. lastframe opens there, paired with this Mac, and your history, watchlist and
+              sources stay in step both ways.
+            </p>
+            <p className="muted">
+              Your phone needs to be on the same Wi-Fi. The code includes a key that lets a device read and change your lastframe
+              data, so don't share it.
+            </p>
+            {info.urls.length > 1 && (
+              <p className="muted">
+                Other addresses for this Mac:{' '}
+                {info.urls.slice(1).map((u) => (
+                  <code key={u}>{new URL(u).host}</code>
+                ))}
+              </p>
+            )}
+            {last && <p className="muted">This Mac last synced at {last}.</p>}
+          </div>
+        </div>
+      )}
+    </section>
   )
 }

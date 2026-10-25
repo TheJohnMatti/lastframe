@@ -259,6 +259,11 @@ section + section { margin-top: 36px; }
 .check-row input { margin-top: 4px; accent-color: var(--accent); }
 .preview { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
 .preview code { padding: 6px 10px; }
+.pair { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+.pair > div:last-child { flex: 1; min-width: 220px; }
+.qr { width: 196px; height: 196px; border-radius: 10px; overflow: hidden; background: #fff; flex: none; }
+.qr svg { display: block; width: 100%; height: 100%; }
+.pair code { margin-right: 6px; }
 .steps { margin: 0 0 14px; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; }
 .vars { border-collapse: collapse; margin-bottom: 14px; font-size: 14px; }
 .vars td { padding: 5px 16px 5px 0; vertical-align: top; }

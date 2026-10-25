@@ -26,3 +26,6 @@ dist-ssr
 # your personal source list stays on your machine
 sources.local.json
 public/sources.local.json
+
+# the sync server's merged library and pairing key
+.lastframe/

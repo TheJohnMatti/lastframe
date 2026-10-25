@@ -4,6 +4,7 @@ export interface Store<T> {
   get(): T
   set(next: T | ((prev: T) => T)): void
   use(): T
+  subscribe(listener: () => void): () => void
 }
 
 // A value kept in localStorage, shared across components and synced across tabs.
@@ -51,5 +52,6 @@ export function createStore<T>(key: string, initial: () => T, migrate?: (raw: un
       emit()
     },
     use: () => useSyncExternalStore(subscribe, () => state),
+    subscribe,
   }
 }

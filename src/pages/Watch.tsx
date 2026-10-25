@@ -27,6 +27,7 @@ import {
 } from '../lib/sources'
 import { extractTimes, isFromFrame } from '../lib/playerMessages'
 import { launchInTab, useExtension } from '../lib/extension'
+import { isThisComputer } from '../lib/sync'
 import { clock, epLabel, parseClock, parseRuntime } from '../lib/format'
 import { href, titlePath, watchPath } from '../lib/router'
 
@@ -278,6 +279,9 @@ function Player({ meta, season, episode }: { meta: Meta; season?: number; episod
     rerender()
   }, [progress, embedded, engagedRef])
 
+  const order = isMovie ? [] : orderedEpisodes(meta)
+  const at = order.findIndex((e) => e.season === season && e.episode === episode)
+
   function watchInTab() {
     if (!current) return
     const p = libraryStore.get()[meta.id]?.progress[key]
@@ -292,7 +296,26 @@ function Player({ meta, season, episode }: { meta: Meta; season?: number; episod
       return
     }
     const item = { id: meta.id, type: meta.type, key, name: meta.name, poster: meta.poster, sourceId: current.source.id }
-    launchInTab({ url, item, resumeAt, expectedDuration: parseRuntime(meta.runtime) }).then((ok) => {
+    const search = isSearchTemplate(current.source.episode)
+    const upcoming = at >= 0 ? order.slice(at + 1, at + 13) : []
+    const nextList = upcoming.map((e) => ({
+      key: epKey(e.season, e.episode),
+      label: `${epLabel(e.season, e.episode)} · ${e.name}`,
+      // a search page isn't an episode's address, so the tab can't jump there by itself
+      url: search
+        ? undefined
+        : candidatesFor(current.source, { ...target, season: e.season, episode: e.episode, startAt: 0 }).find((c) => c.host === current.host)?.url,
+    }))
+    launchInTab({
+      url,
+      item,
+      resumeAt,
+      expectedDuration: parseRuntime(meta.runtime),
+      tmdb: meta.tmdb,
+      templates: { movie: current.source.movie, episode: current.source.episode, hosts: current.source.hosts },
+      next: nextList,
+      watchedAt: settings.watchedAt,
+    }).then((ok) => {
       if (ok) setOpened({ source: current.source.name, tracked: true })
       else setLaunchFailed(url)
     })
@@ -313,8 +336,6 @@ function Player({ meta, season, episode }: { meta: Meta; season?: number; episod
   }
 
   // ---- layout --------------------------------------------------------------
-  const order = isMovie ? [] : orderedEpisodes(meta)
-  const at = order.findIndex((e) => e.season === season && e.episode === episode)
   const prev = at > 0 ? order[at - 1] : undefined
   const next = at >= 0 ? order[at + 1] : undefined
   const watched = !!progress?.watched
@@ -369,6 +390,8 @@ function Player({ meta, season, episode }: { meta: Meta; season?: number; episod
                   <>Opened in a new tab. Without the extension, set your spot below when you stop.</>
                 ) : ext.installed ? (
                   <>Opens in a new tab{resumable ? ' and jumps to where you stopped' : ''}. Your place comes back here by itself.</>
+                ) : !isThisComputer() ? (
+                  <>Opens in a new tab{resumable ? `. You stopped at ${clock(resumable)}` : ''}. Set your spot below when you stop.</>
                 ) : (
                   <>
                     Opens in a new tab. <a href={href('/settings')}>Add the lastframe extension</a> and your place is tracked by

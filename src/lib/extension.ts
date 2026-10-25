@@ -89,6 +89,12 @@ export interface LaunchRequest {
   item: LaunchItem
   resumeAt: number
   expectedDuration?: number
+  tmdb?: string
+  // lets the extension read episode numbers back out of addresses on the site
+  templates?: { movie: string; episode: string; hosts: string[] }
+  // the following episodes on the same source, for "Up next" in the tab
+  next?: { key: string; label: string; url?: string }[]
+  watchedAt?: number
 }
 
 // Ask the extension to open a tracked tab. Resolves false if it didn't answer.

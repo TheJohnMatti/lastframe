@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { href, navigate, useRoute } from './lib/router'
 import { loadLocalSourceFile, sourcesStore } from './lib/sources'
 import { connectExtension } from './lib/extension'
+import { savePairKey, startSync, syncNow } from './lib/sync'
 import type { MediaType } from './lib/meta'
 import { Home } from './pages/Home'
 import { Search } from './pages/Search'
@@ -21,7 +22,17 @@ export default function App() {
   useEffect(() => {
     loadLocalSourceFile()
     connectExtension()
+    startSync()
   }, [])
+
+  // The link in the QR code from Settings on the Mac: #/pair?key=...
+  useEffect(() => {
+    if (parts[0] !== 'pair') return
+    const key = query.get('key')
+    if (key) savePairKey(key)
+    navigate('/', true)
+    syncNow()
+  }, [parts, query])
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -49,6 +60,13 @@ export default function App() {
       break
     case 'settings':
       page = <Settings />
+      break
+    case 'pair':
+      page = (
+        <div className="page">
+          <Empty title="Pairing with your Mac…" />
+        </div>
+      )
       break
     default:
       page = (

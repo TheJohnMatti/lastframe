@@ -5,18 +5,21 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "phone": "vite --host",
     "build": "tsc -b && vite build",
+    "check": "tsc -b && tsc -p tsconfig.extension.json && oxlint",
     "lint": "oxlint",
-    "preview": "vite preview",
-    "check": "tsc -b && tsc -p tsconfig.extension.json && oxlint"
+    "preview": "vite preview"
   },
   "dependencies": {
+    "qrcode": "^1.5.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@types/chrome": "^0.3.6",
     "@types/node": "^24.19.2",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",

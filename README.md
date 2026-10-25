@@ -15,6 +15,8 @@ npm run dev
 
 Open http://localhost:5178. The port is fixed on purpose, because your library is stored per origin.
 
+To use it from your phone as well, start it with `npm run phone` instead (see [On your phone](#on-your-phone)).
+
 ## The browser extension
 
 Pages can't see inside other sites' tabs, so the tracking is done by a small extension in [`extension/`](extension). Install it once in Chrome (or another Chromium browser):
@@ -29,7 +31,10 @@ What it does:
 - When you press play in lastframe, the extension opens the site in a new tab and remembers which title and episode that tab is for.
 - A script in every frame of that tab, including the site's player frame, finds the long video that's playing and reports its position every 10 seconds, on pause, and when you leave. Previews and ads (anything under four minutes, or far shorter than the title) are ignored.
 - On reopening, it waits for the real video to start, seeks to where you stopped (minus the rewind from Settings), checks the seek held, and offers a **Jump there** button if the player fights back.
-- It reports nothing for tabs lastframe didn't open, and keeps everything in your browser. lastframe's page reads the progress through a script that only runs on `localhost:5178`.
+- If you move to another episode on the site itself, it reads the new season and episode from the page's address (the source's template, run backwards) and carries on with that episode.
+- At the watched point it offers **Up next** in the tab: one click opens the next episode on the same site and the same mirror.
+- Its toolbar button shows what a tab is being tracked as. For a page you opened yourself, search the title there, pick the episode (it guesses from the page title) and click **Track this tab**; tick **Remember this page** and that page is tracked by itself next time. **Wrong title?** relinks a tab.
+- It reports nothing for tabs lastframe didn't open or you didn't link, and keeps everything in your browser. lastframe's page reads the progress through a script that only runs on `localhost:5178`.
 
 After pulling changes to `extension/`, press the reload arrow on its card in `chrome://extensions`. Without the extension, lastframe still opens sites in tabs; you set your place by hand.
 
@@ -84,9 +89,19 @@ At 90% of the runtime an episode counts as watched (you can change this in Setti
 
 Resuming passes your spot, minus a few seconds, to sources whose templates use `{t}`, and the extension seeks there in any case.
 
+## On your phone
+
+Phones can't run browser extensions, so on a phone lastframe opens sites in a new tab and you set your place by hand (or play inside lastframe, where players that announce their time are followed). Your history, watchlist and sources are shared with the Mac either way.
+
+1. On the Mac, start lastframe with `npm run phone`. It listens on your Wi-Fi as well as on `localhost`. If macOS asks whether node may accept incoming connections, allow it.
+2. Open **Settings → Use it on your phone** on the Mac and scan the code with your phone's camera.
+3. The phone opens lastframe already paired. Add it to your home screen if you like.
+
+The Mac keeps one merged copy in `.lastframe/state.json` (gitignored), and every device sends its changes and takes the merge back every 30 seconds, on changes, and when you come back to the page. The newer change wins; a title you forget on one device is forgotten on all of them unless you watch it again afterwards. The code holds a key: devices on your network without it get nothing, and only the Mac itself can show the key. The phone has to be on the same Wi-Fi as the Mac.
+
 ## Your data
 
-- History, watchlist, sources and settings are kept in `localStorage` for `localhost:5178`. A different browser or port starts empty.
+- History, watchlist, sources and settings are kept in `localStorage` for `localhost:5178`. A different browser or port starts empty, unless it's synced through `npm run phone` (settings stay per device).
 - **Settings → Export backup** saves everything as JSON. Import merges into what's there (newer progress wins) or replaces it.
 - Titles, posters and episode lists come from [Cinemeta](https://v3-cinemeta.strem.io/manifest.json), Stremio's free metadata service. It needs no API key.
 

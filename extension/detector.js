@@ -26,6 +26,14 @@
   let expected = 0
   let seekTries = 0
   let seekAt = 0
+  /** @type {string | null} */
+  let currentKey = null
+  /** @type {{ label: string, hasUrl: boolean } | null} */
+  let nextUp = null
+  let watchedAt = 0.9
+  let nextOffered = false
+  let reported = false // the first real position has been sent
+  const born = Math.round(performance.timeOrigin) // when this page started
   let stopped = false
   const watched = new WeakSet()
 
@@ -50,6 +58,7 @@
       main = v
       playedFor = 0
       lastTime = null
+      reported = false
     }
     if (v !== main) return
 
@@ -59,6 +68,9 @@
     }
     lastTime = v.currentTime
     tryResume()
+    offerNext()
+    // save as soon as there's a real position, not at the next report tick
+    if (tracked && !reported && playedFor >= 3 && resume !== 'waiting') return send()
 
     const now = Date.now()
     const important = e.type === 'pause' || e.type === 'ended' || e.type === 'seeked'
@@ -73,12 +85,27 @@
     checkedAt = lastSent
     // never write a position before real playback, or while a resume is pending
     const report = playedFor >= 3 && resume !== 'waiting'
-    const state = { position: v.currentTime, duration: v.duration, paused: v.paused, ended: v.ended, report }
+    if (report) reported = true
+    const state = { position: v.currentTime, duration: v.duration, paused: v.paused, ended: v.ended, report, born }
     try {
       chrome.runtime.sendMessage({ type: 'playback', state }, (res) => {
         if (chrome.runtime.lastError || !res) return
         tracked = !!res.tracked
-        if (tracked && res.resumeAt > 0 && resume === 'idle') {
+        if (!tracked) return
+        // the tab moved on to another episode: start that one fresh
+        if (res.key && res.key !== currentKey) {
+          if (currentKey != null) {
+            resume = 'idle'
+            seekTries = 0
+            nextOffered = false
+            reported = false
+          }
+          currentKey = res.key
+        }
+        if (res.announce && res.label) toast(`lastframe: tracking ${res.label}`)
+        nextUp = res.next || null
+        watchedAt = res.watchedAt || 0.9
+        if (res.resumeAt > 0 && resume === 'idle') {
           resume = 'waiting'
           resumeAt = res.resumeAt
           expected = res.expected || 0
@@ -103,6 +130,21 @@
     seekTries++
     seekAt = Date.now()
     v.currentTime = resumeAt
+  }
+
+  // At the watched point, offer the next episode in this same tab.
+  function offerNext() {
+    const v = main
+    if (!tracked || nextOffered || !nextUp || !v || !v.duration || v.currentTime / v.duration < watchedAt) return
+    nextOffered = true
+    if (!nextUp.hasUrl) return toast(`lastframe: up next is ${nextUp.label}`)
+    toast(`Up next: ${nextUp.label}`, 'Play', () => {
+      try {
+        chrome.runtime.sendMessage({ type: 'next' })
+      } catch {
+        // extension went away
+      }
+    }, 30_000)
   }
 
   /** @param {boolean} ok */
@@ -130,10 +172,11 @@
    * @param {string} text
    * @param {string} [action]
    * @param {() => void} [onAction]
+   * @param {number} [ms]
    */
-  function toast(text, action, onAction) {
+  function toast(text, action, onAction, ms) {
     const host = document.createElement('div')
-    const root = host.attachShadow({ mode: 'closed' })
+    const root = host.attachShadow({ mode: 'open' })
     const box = document.createElement('div')
     box.setAttribute(
       'style',
@@ -154,7 +197,7 @@
     }
     root.append(box)
     ;(document.fullscreenElement || document.documentElement).append(host)
-    setTimeout(() => host.remove(), action ? 12_000 : 4_000)
+    setTimeout(() => host.remove(), ms ?? (action ? 12_000 : 4_000))
   }
 
   // Media events don't bubble, but a capturing listener on the document sees
