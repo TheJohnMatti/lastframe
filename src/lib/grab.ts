@@ -94,6 +94,7 @@ export function applyGrab(grab: GrabPayload): { ok: boolean; message: string } {
     })
   }
 
+  retireDemo()
   const source = sourcesStore.get().sources.find((s) => s.hosts.includes(found[0].host))
   const name = names[0]
   if (source?.movie && source.episode) return { ok: true, message: `${name} is ready for movies and episodes.` }
@@ -113,8 +114,18 @@ function applySearch(template: string, host: string): { ok: boolean; message: st
     }
     return { ...st, sources: [...st.sources, normalizeSource({ name, hosts: [host], movie: template, episode: template })!] }
   })
+  retireDemo()
   return {
     ok: true,
     message: `Added ${name} in search mode: it opens the site's search for whatever you play, and you click the right episode there. lastframe still keeps your place.`,
   }
+}
+
+// The bundled demo player is only for trying lastframe out: once a real site
+// is grabbed it would otherwise sit above it and play nothing.
+function retireDemo() {
+  sourcesStore.set((st) => ({
+    ...st,
+    sources: st.sources.map((s) => (/\/demo\/player\.html/.test(s.movie + s.episode) ? { ...s, enabled: false } : s)),
+  }))
 }

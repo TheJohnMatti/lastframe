@@ -41,7 +41,7 @@ You can add sources in three ways:
 - **`public/sources.local.json`**: gitignored. Its contents are loaded on first run, or again from the Sources page. The format is in [`sources.example.json`](sources.example.json).
 - **Import JSON**: load a list you keep somewhere private.
 
-To try lastframe without a real source, use the demo source in `sources.example.json`. It points at `public/demo/player.html`, a stand-in player that plays nothing but reports its time the way real embeds do.
+To try lastframe without a real source, enable the demo source in `sources.example.json`. It turns itself off once you grab a real site. It points at `public/demo/player.html`, a stand-in player that plays nothing but reports its time the way real embeds do.
 
 ### Sites whose players use their own codes
 

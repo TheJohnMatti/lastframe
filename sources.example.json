@@ -1,15 +1,22 @@
 [
   {
     "name": "Demo player (local, plays nothing)",
-    "hosts": ["localhost:5178"],
+    "hosts": [
+      "localhost:5178"
+    ],
     "movie": "http://{host}/demo/player.html?id={imdb}&t={t}",
     "episode": "http://{host}/demo/player.html?id={imdb}&s={season}&e={episode}&t={t}",
-    "sandbox": true
+    "sandbox": true,
+    "enabled": false
   },
   {
     "name": "Example: IMDb ids, several mirrors",
     "enabled": false,
-    "hosts": ["example.com", "example.net", "example.org"],
+    "hosts": [
+      "example.com",
+      "example.net",
+      "example.org"
+    ],
     "movie": "https://{host}/embed/movie/{imdb}",
     "episode": "https://{host}/embed/tv/{imdb}/{season}/{episode}",
     "sandbox": true
